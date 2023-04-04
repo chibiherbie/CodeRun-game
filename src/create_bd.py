@@ -5,9 +5,5 @@ cursor = conn.cursor()
 
 # Создание таблицы
 cursor.execute("""CREATE TABLE user
-                  (id INTEGER PRIMARY KEY, id_tg INTEGER UNIQUE, name CHAR, email CHAR, password CHAR, money CHAR,
-                  user_sh BIT)
+                  (id INTEGER PRIMARY KEY, id_tg INTEGER UNIQUE, name CHAR, coins INTEGER, commands CHAR)
                """)
-
-cursor.execute("""CREATE TABLE site
-                  (email CHAR, money CHAR)""")

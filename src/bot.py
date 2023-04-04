@@ -17,9 +17,6 @@ def start(message):
 
         bot.send_message(message.chat.id, GREETINGS)
 
-        if not db.get_user_sh(message.from_user.id)[0]:
-            msg = bot.send_message(message.chat.id, WHO_ARE_YOU)
-            bot.register_next_step_handler(msg, send_email)
     except Exception as e:
         print(e)
 
@@ -27,89 +24,78 @@ def start(message):
 @bot.message_handler(commands=['help'])
 def help(message):
     try:
-        if not db.get_user_sh(message.from_user.id)[0]:
-            bot.send_message(message.chat.id, 'Сначала авторизируйся /start')
-            return
+        if not db.get_user(message.from_user.id):
+            db.create_user(message.from_user.id, message.from_user.username)
 
         bot.send_message(message.chat.id, HELP)
     except Exception as e:
         print(e)
 
 
-def send_email(message):
+# Смена имени для таблицы лидеров
+@bot.message_handler(commands=['change_name'])
+def change_name(message):
     try:
-        msg = bot.send_message(message.chat.id, 'Теперь введи пароль')
-        bot.register_next_step_handler(msg, send_password, message.text)
+        if not db.get_user(message.from_user.id):
+            db.create_user(message.from_user.id, message.from_user.username)
 
     except Exception as e:
         print(e)
 
 
-def send_password(message, email):
+# Вступить в игру
+@bot.message_handler(commands=['game'])
+def enter_game(message):
     try:
-        if get_user_from_sh(email, message.text):
-            money = db.get_money_for_reg(email)
-            db.update_status_sh(message.from_user.id, email, message.text, money, True)
-            bot.send_message(message.chat.id, 'Всё супер, ты в деле. Можешь ввести для деталей /help')
-        else:
-            bot.send_message(message.chat.id, 'Что-то не так, попробуй ешё раз')
-            msg = bot.send_message(message.chat.id, 'Введи email')
-            bot.register_next_step_handler(msg, send_email)
+        if not db.get_user(message.from_user.id):
+            db.create_user(message.from_user.id, message.from_user.username)
 
-    except Exception as e:
-        print(e)
-
-
-@bot.message_handler(commands=['pay'])
-def pay(message):
-    global pay_user
-
-    try:
-        if not db.get_user_sh(message.from_user.id)[0]:
-            bot.send_message(message.chat.id, 'Сначала авторизируйся /start')
-            return
-
-        if message.text == '/pay':
-            bot.send_message(message.chat.id, 'Забыл отправить аргумент, отправь например так: /pay 10')
-            return
-
-        num = int(message.text.strip('/pay').strip())
-
-        if not auction:
-            bot.send_message(message.chat.id, 'Аукцион ещё не начался)')
-            return
-
-        if num % 5 != 0:
-            bot.send_message(message.chat.id, 'Ставка не кратна 5')
-            return
-
-        if num <= pay_user[1]:
-            bot.send_message(message.chat.id, f'Твоя ставка меньше нынешней ставки - {pay_user[1]}')
-            return
-
-        money = int(db.get_money(message.from_user.id))
-
-        soon_money = money - num
-        if soon_money < 0:
-            bot.send_message(message.chat.id, f'Не достатчоно средств, у тебя - {money}')
-            return
-
-        pay_user = [message.from_user.id, num]
-
-        all_user = db.get_all_user()
-        for user in all_user:
-            bot.send_message(user[1], f'Новая ставка - {num}')
-
-    except Exception as e:
-        print(e)
-        bot.send_message(message.chat.id, 'Что-то не то отправил...')
-
-
-@bot.message_handler(commands=['money'])
-def money(message):
-    try:
         money = db.get_money(message.from_user.id)
         bot.send_message(message.chat.id, f'У тебя сейчас {money} SibCoin')
+    except Exception as e:
+        print(e)
+
+
+# Управлять роботом
+@bot.message_handler(commands=['robot'])
+def pay(message):
+    try:
+        if not db.get_user(message.from_user.id):
+            db.create_user(message.from_user.id, message.from_user.username)
+
+        msg = bot.send_message(message.chat.id, SEND_COMMANDS)
+        bot.register_next_step_handler(msg, register_command)
+
+    except Exception as e:
+        print(e)
+
+
+# Регистрация комманд робота
+def register_command(message):
+    try:
+        if not db.get_user(message.from_user.id):
+            db.create_user(message.from_user.id, message.from_user.username)
+
+        commands = [elem.strip().lower().replace('ё', 'е') for elem in message.text.split('\n')]
+        for num, command in enumerate(commands):
+            if command not in ['вперед', 'назад', 'влево', 'вправо']:
+                bot.send_message(message.chat.id, f'Команда не распознана\n №{num + 1} - {command}')
+                bot.send_message(message.chat.id, f'Проверь правильность написания и отправь ещё раз')
+
+        db.update_commands(message.from_user.id, ' '.join(commands))
+    except Exception as e:
+        print(e)
+
+
+# Сколько у меня баллов
+@bot.message_handler(commands=['coin'])
+def get_coin(message):
+    try:
+        if not db.get_user(message.from_user.id):
+            db.create_user(message.from_user.id, message.from_user.username)
+
+        coin = db.get_coins(message.chat.id)
+        bot.send_message(message.chat.id, f'На твоём счету - {coin}')
     except Exception as e:
         print(e)
 
@@ -126,7 +112,7 @@ def admin_help(message):
         print(e)
 
 
-@bot.message_handler(commands=['all_money'])
+@bot.message_handler(commands=['all_player'])
 def get_all_money(message):
     try:
         if message.from_user.id == ID_ADMIN:
@@ -138,7 +124,7 @@ def get_all_money(message):
         print(e)
 
 
-@bot.message_handler(commands=['start_auction'])
+@bot.message_handler(commands=['start_gamen'])
 def start_auction(message):
     global auction, pay_user
     try:
@@ -194,6 +180,7 @@ def clear(message):
         print(e)
 
 
+# Ответ на любое сообщение
 @bot.message_handler(content_types=['text'])
 def send_text(message):
     bot.send_message(message.chat.id, 'Прости, но я не знаю такой команды')
