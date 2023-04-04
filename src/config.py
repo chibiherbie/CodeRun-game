@@ -1,0 +1,6 @@
+TELEGRAM_BOT_TOKEN = '5677498912:AAFTI8Q7C0IQfY5SUoELf1rPlpDCpbuaS1s'
+SQLITE_DB_FILE = "data/db.db"
+GREETINGS_PHOTO = "static/Logo.jpg"
+URL = 'https://sib-hub.ru/'
+ID_ADMIN = 787316078
+TOKEN_SITE = '1423'
