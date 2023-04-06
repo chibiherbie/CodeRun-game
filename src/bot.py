@@ -72,6 +72,7 @@ def pay(message):
 
 # Регистрация комманд робота
 def register_command(message):
+    """регистрирует команды игрока"""
     try:
         if not db.get_user(message.from_user.id):
             db.create_user(message.from_user.id, message.from_user.username)
@@ -83,6 +84,8 @@ def register_command(message):
                 bot.send_message(message.chat.id, f'Проверь правильность написания и отправь ещё раз')
 
         db.update_commands(message.from_user.id, ' '.join(commands))
+
+        bot.send_message(message.chat.id, f'Команда принята, дождись окончание раунда')
     except Exception as e:
         print(e)
 

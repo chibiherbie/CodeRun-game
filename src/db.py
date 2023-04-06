@@ -56,9 +56,6 @@ def set_money(email, money):
     conn.commit()
 
 
-
-
-
 if __name__ == '__main__':
     init_db()
     print(cursor.execute('''SELECT * FROM user ''').fetchall())
