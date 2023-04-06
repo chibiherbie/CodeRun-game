@@ -7,6 +7,7 @@ from .util import get_user_from_sh, get_all_money_from_sh
 
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 db = DataBase()
+interface_connect = None
 
 
 @bot.message_handler(commands=['start'])
@@ -127,7 +128,7 @@ def get_all_money(message):
         print(e)
 
 
-@bot.message_handler(commands=['start_gamen'])
+@bot.message_handler(commands=['start_game'])
 def start_auction(message):
     global auction, pay_user
     try:
@@ -187,14 +188,19 @@ def clear(message):
 @bot.message_handler(content_types=['text'])
 def send_text(message):
     bot.send_message(message.chat.id, 'Прости, но я не знаю такой команды')
+    interface_connect.message_update.emit(message.text)
 
 
-def start():
+def start_tg(ProgressBarThread):
+    global interface_connect
+
+    interface_connect = ProgressBarThread
+
     bot.polling(none_stop=True)
 
 
 if __name__ == "__main__":
     try:
-        start()
+        start_tg()
     except Exception as error:
         print('Ошибка при запуске -', error)
