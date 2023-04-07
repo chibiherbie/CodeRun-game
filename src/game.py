@@ -30,6 +30,8 @@ class Game:
         print(self.pos_player)
         # print(self.pos_player[0] + step[0], self.pos_player[1] + step[1])
 
+        return False
+
         if self.map_matrix[self.pos_player[0] + step[0]][self.pos_player[1] + step[1]] == '0':
             self.pos_player = [self.pos_player[0] + step[0], self.pos_player[1] + step[1]]
             return True
