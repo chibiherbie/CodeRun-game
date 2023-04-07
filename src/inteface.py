@@ -1,11 +1,13 @@
 import sys
 
 from PyQt5 import uic
-from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot
+from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5 import QtCore
-from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog
-from src.bot import start_tg
+from PyQt5.QtGui import QPixmap, QPainter
+from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QLabel
 
+from src.bot import start_tg
+from src.game import Game
 
 import json
 import shutil
@@ -16,44 +18,97 @@ class MainWindow(QMainWindow):
         super().__init__()
         uic.loadUi('src/static/design/main.ui', self)
 
-        self.progressbar = ProgressBarThread()
+        self.game = Game()
+        self.game.create_code_game()
+
+        self.progressbar = ProgressBarThread(self.game)
         self.progressbar.message_update.connect(self.connect_service, QtCore.Qt.QueuedConnection)
         self.progressbar.start()
+
+        self.init_ui()
+
+    def init_ui(self):
+
+        self.code_game_text.setText(self.game.code_game)
+
+        # self.table_view.setColumnCount(3)  # Set three columns
+        # self.table_view.setRowCount(1)  # and one row
+        #
+        # self.table_view.setItem(1, 1, 1)
+        pixmap = QPixmap('src/static/img/1 Tiles/Map_tile_17.png')
+
+        # for i in range(1, 101):
+        #     label = self.findChild(QLabel, f'label_{i}')
+        #     label.setPixmap(pixmap)
+
+            # self.setCentralWidget(label)
+            # self.resize(pixmap.width(), pixmap.height())
+        # self.paint()
+
+        self.player.setPixmap(QPixmap('src/static/img/player one.png').scaled(40, 40))
+        self.player.move(35, -20)
 
         # # кнопки для открытия других форм
         # self.btn_file.clicked.connect(self.path_account)
         # self.btn_steam.clicked.connect(self.path_steam)
-        # self.btn_cs.clicked.connect(self.path_cs)
-        # self.btn_start.clicked.connect(self.start_farm)
-        # self.btn_start_server.clicked.connect(start_server)
-        # self.btn_setup.clicked.connect(self.mem)
-        # self.btn_sandboxie.clicked.connect(self.path_sandboxie)
-        # self.btn_start_steam.clicked.connect(self.start_steams)
-        #
-        # # создание настроек юзера
-        # self.settings = {}
-        # self.load_settings_user()
-        # print('Настройки юзера', *self.settings.items())
-        #
-        # # Выводим данные на экран
-        # self.txt_steam.setText(self.settings['path_steam'])
-        # self.txt_cs.setText(self.settings['path_cs'])
-        # self.txt_file.setText(self.settings['path_accounts'])
-        # self.txt_sandboxie.setText(self.settings['path_sandboxie'])
-        # self.edit_server.setText(self.settings['server'])
-        # self.edit_interval_start.setText(self.settings['interval_start'])
-        # self.edit_user_account_id.setText(self.settings['account_id'])
-        #
-        # self.progressbar = ProgressBarThread()
+
+    def player_shows(self, data):
+        from time import sleep
+
+        x, y = 40, 40
+        move_player = {
+            'вверх': [(-y, 0), (-1, 0)],
+            'вниз': [(y, 0), (1, 0)],
+            'влево': [(-x, 0), (-1, 0)],
+            'вправо': [(x, 0), (1, 0)]
+        }
+
+        for user, code in data.items():
+            x_s, x_e = 35, -20
+            print(user)
+            for i in code.split():
+                print(i)
+                sleep(2)
+                step = move_player[i]
+                if self.game.check_code_user(step[1]):
+                    print('Двигаем')
+                    self.player.move(x_s + step[0][0], x_e + step[0][0])
+                else:
+                    print('не Двигаем')
+
+            sleep(4)
 
     # Коннект между тг и интерфейсом
-    def connect_service(self, s):
-        print(s)
-        self.test_text.setText(s)
+    def connect_service(self, resp):
+        print(resp)
+
+        if resp['user'] == 'ADMIN':
+            if resp['command'] == 'create_code':
+                print('123')
+                self.code_game_text.setText(self.game.create_code_game())
+
+            elif resp['command'] == 'start_game':
+                game_num = self.game.start_game()
+                pixmap = QPixmap(f'src/static/img/maze/{game_num}.png')
+                self.game_place.setPixmap(pixmap)
+
+            elif resp['command'] == 'end_game':
+                self.game.end_game()
+                pixmap = QPixmap(f'src/static/img/maze/0.png')
+                self.game_place.setPixmap(pixmap)
+                self.player_shows(self.game.end_game())
+
+            return
+
+        if resp['command'] == 'enter_the_game':
+            print(resp['name'])
+        elif resp['command'] == 'register_command':
+            print(resp['code'])
+            self.game.create_user_code(resp)
 
 
 def show_inreface():
-    print('Показываем интерфейс')
+    print('Старт приложения')
 
     app = QApplication(sys.argv)
 
@@ -66,15 +121,15 @@ def show_inreface():
 
 class ProgressBarThread(QThread):
     # сигналы
-    message_update = pyqtSignal(str)
+    message_update = pyqtSignal(dict)
 
-    def __init__(self):
+    def __init__(self, game):
         super().__init__()
+        self.game = game
 
     # определяем откуда сигнал
     def run(self):
-        print('1123')
-        start_tg(self)
+        start_tg(self, self.game)
 
 
 if __name__ == '__main__':

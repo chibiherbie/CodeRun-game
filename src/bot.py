@@ -3,11 +3,19 @@ from .config import TELEGRAM_BOT_TOKEN, ID_ADMIN
 from .message_texts import *
 from .db import DataBase
 from .util import get_user_from_sh, get_all_money_from_sh
-
+from src.game import Game
 
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 db = DataBase()
+
 interface_connect = None
+game_info = Game()
+
+json_sh = {
+    'user': 'None',
+    'command': 'None',
+    'msg': 'None'
+}
 
 
 @bot.message_handler(commands=['start'])
@@ -51,18 +59,51 @@ def enter_game(message):
         if not db.get_user(message.from_user.id):
             db.create_user(message.from_user.id, message.from_user.username)
 
-        money = db.get_money(message.from_user.id)
-        bot.send_message(message.chat.id, f'У тебя сейчас {money} SibCoin')
+        if game_info.game_started:
+            bot.send_message(message.chat.id, f'Игра уже идёт, дождись окончания, после чего введи новый код с монитора')
+            return
+
+        msg = bot.send_message(message.chat.id, 'Введи код игры, который видишь на экране')
+        bot.register_next_step_handler(msg, enter_the_game)
+    except Exception as e:
+        print(e)
+
+
+# Вступить в игру с кодом
+def enter_the_game(message):
+    try:
+        if not db.get_user(message.from_user.id):
+            db.create_user(message.from_user.id, message.from_user.username)
+
+        if message.text == game_info.code_game:
+            msg = {'user': message.chat.id, 'command': 'enter_the_game', 'name': message.from_user.username}
+            interface_connect.message_update.emit(msg)
+
+            db.enter_the_game(message.from_user.id)
+
+            bot.send_message(message.chat.id, f'Ты успешно вошёл в игру!')
+        else:
+            bot.send_message(message.chat.id, f'Код введён не верно, попробуй ещё раз /game')
+
     except Exception as e:
         print(e)
 
 
 # Управлять роботом
 @bot.message_handler(commands=['robot'])
-def pay(message):
+def robot(message):
     try:
         if not db.get_user(message.from_user.id):
             db.create_user(message.from_user.id, message.from_user.username)
+
+        if not game_info.game_started:
+            bot.send_message(message.chat.id, 'Игра ещё не началась! Надо ещё подождать)')
+            return
+
+        if not all(db.get_ingame(message.from_user.id)):
+            print(db.get_ingame(message.from_user.id))
+            bot.send_message(message.chat.id, 'Ты пока не можешь отправлять команды. Дождись окончания и отправь код комнаты')
+            return
 
         msg = bot.send_message(message.chat.id, SEND_COMMANDS)
         bot.register_next_step_handler(msg, register_command)
@@ -80,13 +121,19 @@ def register_command(message):
 
         commands = [elem.strip().lower().replace('ё', 'е') for elem in message.text.split('\n')]
         for num, command in enumerate(commands):
-            if command not in ['вперед', 'назад', 'влево', 'вправо']:
+            if command not in ['вверх', 'вниз', 'влево', 'вправо']:
                 bot.send_message(message.chat.id, f'Команда не распознана\n №{num + 1} - {command}')
-                bot.send_message(message.chat.id, f'Проверь правильность написания и отправь ещё раз')
+                bot.send_message(message.chat.id, f'Проверь правильность написания и отправь ещё раз /robot')
+                return
 
         db.update_commands(message.from_user.id, ' '.join(commands))
 
-        bot.send_message(message.chat.id, f'Команда принята, дождись окончание раунда')
+        msg = {'user': message.chat.id, 'command': 'register_command',
+               'code': ' '.join(commands)}
+
+        interface_connect.message_update.emit(msg)
+
+        bot.send_message(message.from_user.id, f'Команда принята, дождись окончание раунда')
     except Exception as e:
         print(e)
 
@@ -104,13 +151,27 @@ def get_coin(message):
         print(e)
 
 
-# ----ADMIN-----
+# -------ADMIN---------
 
 @bot.message_handler(commands=['admin'])
 def admin_help(message):
     try:
         if message.from_user.id == ID_ADMIN:
             bot.send_message(message.chat.id, ADMIN_HELP)
+
+    except Exception as e:
+        print(e)
+
+
+@bot.message_handler(commands=['create_code'])
+def get_code(message):
+    try:
+        if message.from_user.id == ID_ADMIN:
+            msg = {'user': 'ADMIN', 'command': 'create_code'}
+
+            print(msg)
+
+            interface_connect.message_update.emit(msg)
 
     except Exception as e:
         print(e)
@@ -129,46 +190,32 @@ def get_all_money(message):
 
 
 @bot.message_handler(commands=['start_game'])
-def start_auction(message):
-    global auction, pay_user
+def start_game(message):
     try:
-        if message.text == '/start_auction':
-            bot.send_message(message.chat.id, 'Забыл отправить аргумент, отправь например так: /start_auction 10')
-            return
-
-        start_price = int(message.text.strip('/start_auction').strip())
-
         if message.from_user.id == ID_ADMIN:
-            auction = True
-            pay_user = ['123', start_price]
+            msg = {'user': 'ADMIN', 'command': 'start_game'}
 
-            all_user = db.get_all_user()
+            print(msg)
 
-            for user in all_user:
-                bot.send_message(user[1], f'Аукцион начался\n\nНачальная ставка - {start_price}')
+            interface_connect.message_update.emit(msg)
 
             bot.send_message(ID_ADMIN, f'Start')
 
     except Exception as e:
         print(e)
-        bot.send_message(message.chat.id, 'Что-то не то отправил...')
 
 
-@bot.message_handler(commands=['end_auction'])
-def end_auction(message):
-    global auction, pay_user
+@bot.message_handler(commands=['end_game'])
+def end_game(message):
     try:
         if message.from_user.id == ID_ADMIN:
-            auction = False
-            db.minus_money(pay_user[0], pay_user[1])
+            msg = {'user': 'ADMIN', 'command': 'end_game'}
 
-            all_user = db.get_all_user()
+            print(msg)
 
-            for user in all_user:
-                bot.send_message(user[1], f'Аукцион окончен\n\nКонечная ставка - {pay_user[1]}')
+            interface_connect.message_update.emit(msg)
 
-            bot.send_message(ID_ADMIN, f'{pay_user}')
-            pay_user = ['123', 0]
+            bot.send_message(ID_ADMIN, f'End')
 
     except Exception as e:
         print(e)
@@ -187,14 +234,16 @@ def clear(message):
 # Ответ на любое сообщение
 @bot.message_handler(content_types=['text'])
 def send_text(message):
-    bot.send_message(message.chat.id, 'Прости, но я не знаю такой команды')
-    interface_connect.message_update.emit(message.text)
+    bot.send_message(message.chat.id, 'Прости, но я не знаю такой команды /help')
 
 
-def start_tg(ProgressBarThread):
-    global interface_connect
+def start_tg(progressbarthread, game):
+    global interface_connect, game_info
 
-    interface_connect = ProgressBarThread
+    print('Запуск бота')
+
+    interface_connect = progressbarthread
+    game_info = game
 
     bot.polling(none_stop=True)
 

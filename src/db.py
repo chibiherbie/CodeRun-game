@@ -14,8 +14,12 @@ class DataBase:
     def get_user(self, user_id_tg):
         return self.cursor.execute('''SELECT * FROM user WHERE id_tg=? ''', (user_id_tg, )).fetchone()
 
+    def get_ingame(self, user_id_tg):
+        return self.cursor.execute('''SELECT ingame FROM user WHERE id_tg=? ''', (user_id_tg, )).fetchone()
+
     def create_user(self, user_id_tg, user_name):
-        self.cursor.execute('''INSERT INTO user(id_tg, name, coins) VALUES(?, ?, ?);''', (user_id_tg, user_name, 0))
+        self.cursor.execute('''INSERT INTO user(id_tg, name, coins, ingame) VALUES(?, ?, ?, ?);''',
+                            (user_id_tg, user_name, 0, False))
         self.conn.commit()
 
     def get_coins(self, user_id_tg):
@@ -27,6 +31,14 @@ class DataBase:
 
     def clear_tables(self):
         self.cursor.execute('''DELETE FROM user;''')
+        self.conn.commit()
+
+    def enter_the_game(self, user_id_tg):
+        self.cursor.execute('''UPDATE user SET ingame = ? WHERE id_tg = ?;''', (True, user_id_tg))
+        self.conn.commit()
+
+    def end_the_game(self):
+        self.cursor.execute('''UPDATE user SET ingame = ?;''', (True, ))
         self.conn.commit()
 
 
